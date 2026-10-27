@@ -1,0 +1,53 @@
+services:
+  pic-poster:
+    build: .
+    container_name: pic-poster-redbook
+    restart: unless-stopped
+    init: true
+    user: "${PUID:-1004}:${PGID:-1004}"
+    ports:
+      - "8787:8787"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      PORT: ${PORT:-8787}
+      PHOTO_ROOT: /photos
+      DATA_ROOT: /data
+      SCHEDULE: ${SCHEDULE:-0 9 * * *}
+      PUBLISH_ENABLED: ${PUBLISH_ENABLED:-false}
+      XHS_CREATOR_URL: ${XHS_CREATOR_URL:-https://creator.xiaohongshu.com/publish/publish}
+      XHS_HEADLESS: ${XHS_HEADLESS:-true}
+      XHS_SESSION_DIR: /data/xhs-session
+      XHS_BROWSER_PATH: ${XHS_BROWSER_PATH:-/opt/google/chrome/chrome}
+      GEOCODE_ENABLED: ${GEOCODE_ENABLED:-true}
+      GEOCODE_USER_AGENT: ${GEOCODE_USER_AGENT:-pic-poster-redbook/0.1}
+      MAX_PHOTOS_PER_RUN: ${MAX_PHOTOS_PER_RUN:-500}
+      MAX_SCORING_PHOTOS_PER_RUN: ${MAX_SCORING_PHOTOS_PER_RUN:-500}
+      SCORING_SCHEDULE: ${SCORING_SCHEDULE:-0 2 * * *}
+      SELECTION_SCHEDULE: ${SELECTION_SCHEDULE:-0 3 * * *}
+      MAX_POSTS_PER_RUN: ${MAX_POSTS_PER_RUN:-2}
+      MAX_IMAGES_PER_POST: ${MAX_IMAGES_PER_POST:-6}
+      EVENT_GAP_HOURS: ${EVENT_GAP_HOURS:-6}
+      EVENT_RADIUS_METERS: ${EVENT_RADIUS_METERS:-300}
+      MIN_SHORT_EDGE: ${MIN_SHORT_EDGE:-720}
+      MIN_TECHNICAL_SCORE: ${MIN_TECHNICAL_SCORE:-50}
+      MIN_QUALITY_SCORE: ${MIN_QUALITY_SCORE:-65}
+      MIN_AESTHETIC_SCORE: ${MIN_AESTHETIC_SCORE:-68}
+      MIN_STORY_SCORE: ${MIN_STORY_SCORE:-60}
+      MIN_COMPOSITION_SCORE: ${MIN_COMPOSITION_SCORE:-60}
+      MIN_TOTAL_SCORE: ${MIN_TOTAL_SCORE:-65}
+      DUPLICATE_HASH_DISTANCE: ${DUPLICATE_HASH_DISTANCE:-4}
+      FILE_SETTLE_SECONDS: ${FILE_SETTLE_SECONDS:-60}
+      VISION_API_URL: ${VISION_API_URL:-}
+      VISION_API_KEY: ${VISION_API_KEY:-}
+      VISION_MODEL: ${VISION_MODEL:-}
+      VISION_TIMEOUT_MS: ${VISION_TIMEOUT_MS:-100000}
+      DEFAULT_TITLE: ${DEFAULT_TITLE:-今日照片}
+      DEFAULT_DESCRIPTION: ${DEFAULT_DESCRIPTION:-记录生活中的风景。}
+    volumes:
+      - ${NAS_PHOTO_PATH:-./photos}:/photos:ro
+      - ${NAS_DATA_PATH:-./data}:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

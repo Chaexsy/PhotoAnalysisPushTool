@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>照片发布台</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">PIC POSTER / REDBOOK</p>
+          <h1 id="pageTitle" tabindex="-1">照片库</h1>
+          <p class="subtitle" id="pageDescription">浏览全部图片，筛选扫描状态并查看详细评价。</p>
+        </div>
+        <div class="actions">
+          <button class="button secondary" id="settingsButton">运行配置</button>
+          <button class="button secondary" id="refreshButton">刷新</button>
+        </div>
+      </header>
+
+      <nav class="page-nav" aria-label="功能导航">
+        <a href="/photos" data-page-link="photos" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m4 18 5-5 4 4 3-3 5 5"/></svg><span>照片库</span></a>
+        <a href="/queue" data-page-link="queue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span>待发布队列</span></a>
+        <a href="/publications" data-page-link="publications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5M12 7v5l3 2"/></svg><span>发布记录</span></a>
+      </nav>
+
+      <main id="pageContent">
+        <p id="pageMessage" class="page-message" role="status" hidden></p>
+        <section id="summaryPanel" class="summary-grid" aria-label="运行概况" hidden>
+          <article class="summary-card accent"><span>已发布照片</span><strong id="publishedCount">—</strong><small>已确认成功</small></article>
+          <article class="summary-card"><span>待分析照片</span><strong id="analysisCount">—</strong><small>等待视觉模型</small></article>
+          <article class="summary-card"><span>待人工核验</span><strong id="uncertainCount">—</strong><small>不会自动重试</small></article>
+          <article class="summary-card"><span>当前发布模式</span><strong id="modeCount">—</strong><small>配置在“运行配置”中</small></article>
+        </section>
+
+        <section class="panel queue-panel" data-page="queue" hidden>
+          <div class="section-heading">
+            <div><h2>待发布队列</h2><p class="muted">点击“准备发布”下载照片、复制文案，在自己的小红书网页完成暂存或发布，再回系统确认。只有明确确认后才移入发布记录。</p></div>
+            <span class="queue-count" id="draftCount">0 篇</span>
+          </div>
+          <div class="draft-schedule-toolbar"><div><strong>发布时间规则</strong><span id="draftScheduleRule">正在加载…</span><p class="form-hint">可按当前规则重新安排所有待发布草稿的时间，手动修改的时间也会被重置。</p></div><button class="button secondary" id="rescheduleDrafts" type="button">按规则重置所有时间</button></div>
+          <div class="draft-merge-toolbar"><span id="mergeDraftSelection" role="status">勾选两篇或更多笔记后合并</span><div><button class="button secondary" id="clearMergeSelection" type="button" disabled>清空选择</button><button class="button primary" id="mergeDraftsButton" type="button" disabled>合并所选笔记</button></div></div>
+          <div id="drafts" class="drafts" aria-live="polite"></div>
+          <div id="draftEmpty" class="queue-empty">还没有待发布草稿。配置视觉模型并扫描照片后，系统会在这里生成候选笔记。</div>
+        </section>
+
+        <section class="panel library-panel" data-page="photos" hidden>
+          <section id="scanPanel" class="scan-panel" aria-label="照片任务">
+            <div class="scan-heading"><div><h2>扫描评分 <span id="scanPhase" class="scan-phase">待命</span></h2><p class="muted">每轮最多 <span id="scanLimit">500</span> 张；先重试续扫指针左侧的失败照片，再从指针向右扫描。重试不移动指针，失败达到 5 次跳过。</p></div><div class="scan-actions"><button class="button secondary" id="scanStopButton" type="button" hidden>停止扫描</button><button class="button primary" id="scanButton" type="button">立即扫描评分</button></div></div>
+            <p id="scanStatus" class="scan-status" role="status">等待扫描。</p>
+            <div class="scan-progress" aria-label="照片扫描进度"><div class="scan-progress-heading"><strong>照片扫描队列</strong><span id="scanProgressStats">尚未建立队列</span></div><div id="scanProgressBar" class="scan-progress-bar"><div id="scanProgressSegments" class="scan-progress-segments" role="progressbar" aria-label="照片扫描完成数量"></div><input id="scanProgressPointer" class="scan-progress-pointer" type="range" min="0" max="0" value="0" step="1" aria-label="扫描起始位置" aria-describedby="scanPointerHint" disabled></div><div class="scan-progress-legend"><span>队尾：较新</span><span><i class="progress-dot unscanned"></i>未扫描</span><span><i class="progress-dot completed"></i>已完成</span><span><i class="progress-dot failed"></i>失败（达到 5 次跳过）</span><span id="scanProgressPointerLabel">续扫指针：队尾</span><span>队首：较早</span></div><p id="scanPointerHint" class="form-hint">拖动圆形指针，松开即保存；从所选位置向右扫描，已成功评分自动跳过。扫描中移动会自动切换位置继续，停止时移动则等待点击“继续扫描”。</p></div>
+            <dl class="scan-file-info"><div><dt>目录</dt><dd id="scanDirectory">—</dd></div><div><dt>文件名</dt><dd id="scanFileName">—</dd></div><div><dt>拍摄时间</dt><dd id="scanCapturedAt">—</dd></div></dl>
+            <p id="scanUpdatedAt" class="form-hint">扫描信息尚未更新</p>
+            <div class="selection-task"><div><h3>筛选发布 <span id="selectionPhase" class="scan-phase">待命</span></h3><p id="selectionStatus" class="muted">每天遍历已评分照片，按拍摄时间和地点归组，生成待发布草稿。</p></div><button class="button secondary" id="selectButton" type="button">立即筛选发布</button></div>
+          </section>
+          <div class="section-heading">
+            <div><h2>照片库</h2><p class="muted">浏览指定目录中的全部图片，点击照片查看详细评价。</p></div>
+            <span class="queue-count" id="photoLibraryCount">0 张</span>
+          </div>
+          <p id="photoLibrarySummary" class="library-summary" role="status"></p>
+          <form id="photoLibraryFilters" class="photo-filters">
+            <label>目录（包含子目录）<select id="photoDirectoryFilter"><option value="">全部目录</option></select></label>
+            <label>时间类型<select id="photoTimeField"><option value="captured">拍摄时间</option><option value="modified">文件修改时间</option><option value="analyzed">分析时间</option></select></label>
+            <label>起始日期<input id="photoFromFilter" type="date"></label>
+            <label>结束日期<input id="photoToFilter" type="date"></label>
+            <label>地点<input id="photoLocationFilter" type="text" placeholder="地点名称关键字"></label>
+            <label>位置信息<select id="photoHasLocation"><option value="all">全部</option><option value="yes">有地点或 GPS</option><option value="no">无地点和 GPS</option></select></label>
+            <label>扫描状态<select id="photoScanFilter"><option value="all">全部</option><option value="scanned">已尝试分析</option><option value="unscanned">尚未分析</option><option value="failed">分析失败</option></select></label>
+            <label>模型评价<select id="photoEvaluatedFilter"><option value="all">全部</option><option value="assessed">已评估</option><option value="unassessed">尚未评估</option><option value="failed">评估失败</option><option value="skipped">技术筛选未通过</option></select></label>
+            <label>评分状态<select id="photoRatedFilter"><option value="all">全部</option><option value="unrated">未评分</option><option value="lt65">&lt;65</option><option value="65to75">65~~~75</option><option value="75to85">75~~~85</option><option value="gt85">&gt;85</option></select></label>
+            <label>排序<select id="photoSort"><option value="newest">时间从新到旧</option><option value="oldest">时间从旧到新</option><option value="score">综合评分从高到低</option></select></label>
+            <div class="photo-filter-actions"><button class="button primary" type="submit">查询照片</button><button class="button secondary" id="resetPhotoFilters" type="button">重置</button><button class="button secondary" id="refreshPhotoLibrary" type="button">更新图片列表</button></div>
+          </form>
+          <p class="form-hint">所有筛选条件需同时满足。按拍摄时间浏览无需先扫描或评分；结束日期包含当天，缺少拍摄时间的照片可按文件修改时间查询。</p>
+          <p id="photoFilterPending" class="form-hint" hidden>筛选条件已修改，请点击“查询照片”应用。</p>
+          <div id="photoAppliedFilters" class="applied-filters" role="status"></div>
+          <p id="photoLibraryMessage" class="form-hint" role="status"></p>
+          <div id="photoLibrary" class="photo-library" aria-live="polite"></div>
+          <div id="photoLibraryEmpty" class="queue-empty" hidden><p id="photoLibraryEmptyText">没有符合所有筛选条件的照片。</p><button id="photoDateOnlyQuery" class="button secondary" type="button" hidden>保留时间范围，清除其他筛选</button></div>
+          <div class="library-pagination"><button class="button secondary" id="photoPrevPage" type="button">上一页</button><span id="photoPageInfo" class="form-hint">第 1 / 1 页</span><label class="page-jump-label">跳转到 <input id="photoPageInput" type="number" min="1" step="1" value="1" inputmode="numeric" aria-label="照片库页码"></label><button class="button secondary" id="photoPageJump" type="button">跳转</button><button class="button secondary" id="photoNextPage" type="button">下一页</button></div>
+        </section>
+
+        <div data-page="publications" hidden>
+        <section class="panel controls">
+          <div>
+            <h2>发布记录</h2>
+            <p class="muted">每条记录包含草稿保存时间、发布时间、照片、渠道和结果。</p>
+          </div>
+          <label class="select-label">状态
+            <select id="statusFilter">
+              <option value="all">全部</option>
+              <option value="published">已成功</option>
+              <option value="draft_saved">已暂存（未发布）</option>
+              <option value="uncertain">待核验</option>
+              <option value="failed">失败</option>
+            </select>
+          </label>
+        </section>
+
+        <section id="records" class="records" aria-live="polite"></section>
+        <section id="emptyState" class="empty panel" hidden>
+          <div class="empty-icon">◎</div>
+          <h2>还没有发布记录</h2>
+          <p>先扫描照片，审核筛选结果后，系统会把每次发布显示在这里。</p>
+        </section>
+        </div>
+      </main>
+
+      <footer><span id="lastUpdated">尚未刷新</span><span>规则：同一事件最多 3 篇 · 每篇方向一致</span></footer>
+    </div>
+    <dialog id="settingsDialog" class="modal">
+      <div class="modal-card settings-modal-card">
+        <div class="modal-toast" role="status" aria-live="polite"></div>
+        <div class="modal-header"><div><p class="eyebrow">SETTINGS</p><h2>运行配置</h2></div><button class="icon-button" data-close-dialog="settingsDialog" aria-label="关闭">×</button></div>
+        <p class="muted">配置只在此窗口显示。保存后立即生效，并写入 NAS 数据目录。</p>
+        <form id="settingsForm" class="settings-form">
+          <div class="settings-group"><h3>视觉模型</h3><div class="form-grid">
+            <label>接口 URL<input id="visionApiUrl" type="url" placeholder="https://api.example.com/v1/chat/completions" autocomplete="off"></label>
+            <label>模型名称<input id="visionModel" type="text" placeholder="例如 qwen-vl-max" autocomplete="off"></label>
+            <label>API Key<input id="visionApiKey" type="password" placeholder="已配置时留空则保持原密钥" autocomplete="new-password"></label>
+            <label class="checkbox-label"><input id="clearVisionKey" type="checkbox"> 清空已保存的 API Key</label>
+          </div><p class="form-hint" id="visionKeyHint">尚未配置 API Key</p></div>
+          <div class="settings-group"><h3>照片发布周期</h3><div class="form-grid schedule-grid">
+            <p class="form-hint">人工交接模式：以下规则仅安排计划时间，系统不自动操作小红书。</p>
+            <label>周期<select id="scheduleCycle"><option value="daily">每天</option><option value="every2days">每 2 天</option><option value="every3days">每 3 天</option><option value="weekly">每周</option></select></label>
+            <label>发布时间<input id="publishTime" type="time" value="09:00" required></label>
+            <label id="weeklyDayField">每周发布日<select id="weeklyDay"><option value="1">周一</option><option value="2">周二</option><option value="3">周三</option><option value="4">周四</option><option value="5">周五</option><option value="6">周六</option><option value="0">周日</option></select></label>
+          </div></div>
+          <div class="settings-group"><h3>小红书账户</h3><div class="form-grid">
+            <label>账号标识<input id="xhsAccount" type="text" placeholder="例如：摄影账号" autocomplete="off"></label>
+            <label hidden>创作中心 URL<input id="xhsCreatorUrl" type="url" placeholder="https://creator.xiaohongshu.com/publish/publish" autocomplete="off"></label>
+          </div><p class="form-hint">请在自己的浏览器登录小红书。这里的账号标识仅作备注，无需登录 NAS 会话。</p>
+</div>
+          <div class="settings-actions"><span class="form-hint" id="settingsStatus"></span><button class="button primary" id="saveSettingsButton" type="submit">保存配置</button></div>
+        </form>
+      </div>
+    </dialog>
+    <dialog id="draftDialog" class="modal"><div class="modal-card draft-modal-card">
+      <div class="modal-toast" role="status" aria-live="polite"></div>
+      <div class="modal-header"><div><p class="eyebrow">DRAFT EDITOR</p><h2>编辑待发布照片</h2><p class="muted" id="draftMeta"></p></div><button class="icon-button" data-close-dialog="draftDialog" aria-label="关闭">×</button></div>
+      <form id="draftForm"><input id="draftId" type="hidden"><input id="draftLocationTag" type="hidden"><input id="draftTopics" type="hidden"><div class="draft-editor-body"><div class="form-grid draft-text-fields"><label>标题（可留空）<input id="draftTitle" type="text" maxlength="20"></label><label>精简文案<textarea id="draftDescription" rows="2" maxlength="50"></textarea><span class="form-hint">原则上不超过 50 个字</span></label><label>发布时间<input id="draftScheduledAt" type="datetime-local"></label>
+          <fieldset class="xhs-picker-field"><legend>地点关键词</legend><div class="xhs-picker-row"><input id="draftLocationQuery" type="text" maxlength="100" placeholder="输入地点关键词"><button class="button secondary" id="searchLocationButton" type="button">设置地点关键词</button></div><p id="draftLocationSuggestion" class="form-hint"></p><div id="draftLocationCandidates" class="xhs-candidates" role="listbox" aria-label="小红书地点候选"></div><div id="draftLocationSelected" class="xhs-selected muted">未确认地点</div><button class="button link-button" id="clearLocationButton" type="button">清空地点</button></fieldset>
+          <fieldset class="xhs-picker-field"><legend>话题关键词（最多 10 个）</legend><div class="xhs-picker-row"><input id="draftTopicQuery" type="text" maxlength="30" placeholder="输入话题关键词"><button class="button secondary" id="searchTopicButton" type="button">添加话题关键词</button></div><p class="form-hint">每个话题最多 30 个字；发布时请在小红书网页搜索并选择真实话题。</p><div id="draftTopicCandidates" class="xhs-candidates" role="listbox" aria-label="小红书话题候选"></div><div id="draftTopicSelected" class="xhs-selected"></div></fieldset></div>
+        <div class="draft-photos-heading"><div><strong>已选照片</strong><p class="form-hint" id="draftPhotoRule">同一拍摄事件、同一方向和同一主题，最多 6 张。</p></div><button class="button secondary" id="addDraftPhotos" type="button">添加照片</button></div><div id="draftPhotoOptions" class="draft-photo-options"></div></div>
+        <div class="settings-actions draft-editor-actions"><span class="form-hint" id="draftStatus"></span><button class="button secondary" type="button" data-close-dialog="draftDialog">取消</button><button class="button primary" type="submit">保存草稿</button></div>
+      </form>
+    </div></dialog>
+    <dialog id="mergeDraftDialog" class="modal merge-draft-modal" aria-labelledby="mergeDraftTitle"><div class="modal-card">
+      <div class="modal-toast" role="status" aria-live="polite"></div>
+      <div class="modal-header"><div><p class="eyebrow">MERGE DRAFTS</p><h2 id="mergeDraftTitle">合并待发布笔记</h2><p class="muted" id="mergeDraftSummary"></p></div><button type="button" class="icon-button" data-close-dialog="mergeDraftDialog" aria-label="关闭">×</button></div>
+      <form id="mergeDraftForm"><div class="merge-draft-body"><div class="form-grid merge-text-fields"><label>合并后标题（可留空）<input id="mergeTitle" type="text" maxlength="20"></label><label>计划时间<input id="mergeScheduledAt" type="datetime-local"></label><label class="merge-description">精简文案（最多 50 字）<textarea id="mergeDescription" rows="2" maxlength="50"></textarea></label></div>
+        <p class="form-hint" id="mergeMetadataHint"></p><div class="merge-photo-heading"><strong id="mergePhotoCount" role="status"></strong><button class="button link-button" id="clearMergePhotos" type="button">清空照片选择</button></div><p class="form-hint" id="mergePhotoHint"></p><div id="mergePhotoOptions" class="merge-photo-options"></div>
+        <p class="merge-confirm-hint">确认后，所选原草稿将由一篇合并草稿替代；未入选的原始照片及评分保留在照片库中。本操作仅整理系统草稿。</p></div>
+        <div class="settings-actions"><span class="form-hint error" id="mergeDraftStatus" role="status"></span><button class="button secondary" type="button" data-close-dialog="mergeDraftDialog">取消</button><button class="button primary" id="confirmMergeDrafts" type="submit">确认合并</button></div>
+      </form>
+    </div></dialog>
+    <dialog id="photoPickerDialog" class="modal photo-picker-modal"><div class="modal-card">
+      <div class="modal-toast" role="status" aria-live="polite"></div>
+      <div class="modal-header"><div><p class="eyebrow">PHOTO PICKER</p><h2>添加照片</h2><p class="muted" id="photoPickerHint">这里只显示当前事件中尚未加入本篇草稿的可用照片。</p></div><button class="icon-button" data-close-dialog="photoPickerDialog" aria-label="关闭">×</button></div>
+      <form id="photoPickerForm"><div id="pickerPhotoOptions" class="draft-photo-options photo-picker-options"></div><div class="picker-more"><button class="button secondary" id="loadMorePicker" type="button">加载更多照片</button></div><div class="settings-actions"><span class="form-hint">勾选后点击加入，编辑窗口只保留已选照片。</span><button class="button secondary" type="button" data-close-dialog="photoPickerDialog">取消</button><button class="button primary" type="submit">加入照片</button></div></form>
+    </div></dialog>
+    <dialog id="photoDetailDialog" class="modal photo-detail-modal"><div class="modal-card">
+      <div class="modal-toast" role="status" aria-live="polite"></div>
+      <div class="modal-header"><div><p class="eyebrow">PHOTO DETAIL</p><h2 id="photoDetailTitle">照片详情</h2><p class="muted" id="photoDetailMeta"></p></div><button class="icon-button" data-close-dialog="photoDetailDialog" aria-label="关闭">×</button></div>
+      <div id="photoDetail" class="photo-detail"></div>
+    </div></dialog>
+    <dialog id="deleteDraftDialog" class="modal delete-draft-modal" aria-labelledby="deleteDraftTitle" aria-describedby="deleteDraftDescription"><div class="modal-card">
+      <div class="modal-toast" role="status" aria-live="polite"></div>
+      <div class="modal-header"><h2 id="deleteDraftTitle">删除待发布草稿？</h2><button type="button" class="icon-button" data-close-dialog="deleteDraftDialog" aria-label="关闭">×</button></div>
+      <p id="deleteDraftDescription">将删除“<strong id="deleteDraftName"></strong>”（<span id="deleteDraftPhotoCount">0</span> 张照片）。原始照片和评分记录会保留。</p>
+      <form id="deleteDraftForm"><div class="settings-actions"><button type="button" class="button secondary" data-close-dialog="deleteDraftDialog" autofocus>取消</button><button type="submit" class="button danger" id="confirmDeleteDraft">确认删除</button></div></form>
+    </div></dialog>
+    <div id="toast" class="toast" role="status"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
