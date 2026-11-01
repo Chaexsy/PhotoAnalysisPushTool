@@ -300,7 +300,7 @@ function openMergeDrafts() {
   $('#mergeScheduledAt').value = dateTimeLocal(first.scheduledAt);
   const sameLocation = drafts.every(draft => draft.locationTag === first.locationTag);
   $('#mergeMetadataHint').textContent = `标题、文案、计划时间和话题默认沿用第一篇笔记。${sameLocation ? '地点沿用共同地点。' : '原草稿地点不同，合并后清空地点标记。'}合并后仍可通过“编辑草稿”调整话题和地点。`;
-  $('#mergePhotoHint').textContent = `请勾选 1–${state.settings?.maxImagesPerPost ?? 6} 张照片，横图和竖图不能混选；点击图片可放大查看。`;
+  $('#mergePhotoHint').textContent = `请勾选 1–${state.settings?.maxImagesPerPost ?? 12} 张照片，横图和竖图不能混选；点击图片可放大查看。`;
   $('#mergeDraftStatus').textContent = '';
   renderMergePhotos(); openDialog('mergeDraftDialog');
 }
@@ -324,7 +324,7 @@ function renderMergePhotos() {
 }
 
 function updateMergePhotoSelection() {
-  const max = state.settings?.maxImagesPerPost ?? 6;
+  const max = state.settings?.maxImagesPerPost ?? 12;
   const orientation = state.photos.get([...state.mergePhotoIds][0])?.metrics?.orientation;
   $('#mergePhotoCount').textContent = `已选 ${state.mergePhotoIds.size} / ${max} 张${orientation ? ` · ${orientation === 'landscape' ? '横图' : '竖图'}` : ''}`;
   $('#mergePhotoOptions').querySelectorAll('input[type="checkbox"]').forEach(input => {
@@ -770,7 +770,7 @@ async function openDraftEditor(id) {
   $('#draftTopicQuery').value = '';
   $('#draftLocationSuggestion').textContent = `建议地点：${draft.locationName || '无'}。发布时请在自己的小红书网页搜索并选择。`;
   $('#draftMeta').textContent = `${draft.locationName || '未记录地点'} · ${draft.orientation === 'landscape' ? '横图' : '竖图'} · ${draft.theme || '—'}`;
-  $('#draftPhotoRule').textContent = `${draft.merged ? '合并笔记可包含不同拍摄事件和主题，须保持方向一致' : '同一拍摄事件、同一方向和同一主题'}，最多 ${state.settings?.maxImagesPerPost ?? 6} 张。`;
+  $('#draftPhotoRule').textContent = `${draft.merged ? '合并笔记可包含不同拍摄事件和主题，须保持方向一致' : '同一拍摄事件、同一方向和同一主题'}，最多 ${state.settings?.maxImagesPerPost ?? 12} 张。`;
   renderDraftMetadata(); renderDraftSelectedPhotos(); renderDraftPicker();
   $('#draftStatus').textContent = ''; openDialog('draftDialog');
 }

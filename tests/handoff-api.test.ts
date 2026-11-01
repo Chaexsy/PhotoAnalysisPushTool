@@ -7,7 +7,7 @@ import path from 'node:path';
 
 vi.mock('../src/repository.js', async () => {
   const { PhotoStore } = await import('../src/db.js');
-  return { store: new PhotoStore(':memory:'), selectionPolicy: { minQuality: 60, minAesthetics: 65, minStory: 60, minComposition: 60, minTotal: 60, minTechnical: 50, minShortEdge: 500, maxImages: 6, duplicateDistance: 4 } };
+  return { store: new PhotoStore(':memory:'), selectionPolicy: { minQuality: 60, minAesthetics: 65, minStory: 60, minComposition: 60, minTotal: 60, minTechnical: 50, minShortEdge: 500, maxImages: 12, duplicateDistance: 4 } };
 });
 vi.mock('../src/scheduler.js', () => ({ reschedule: vi.fn() }));
 vi.mock('../src/xhs.js', () => ({ XhsPublisher: vi.fn() }));
@@ -30,6 +30,46 @@ beforeEach(async () => {
 afterEach(async () => { server.closeAllConnections(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); fs.rmSync(dir, { recursive: true, force: true }); });
 
 describe('handoff HTTP boundary', () => {
+  it('supports twelve photos through merging, editing and ZIP export, and rejects thirteen without changing drafts', async () => {
+    const original = store.listPhotos()[0];
+    for (let i = 1; i <= 12; i++) {
+      const filePath = path.join(dir, `photo-${i}.jpg`);
+      fs.writeFileSync(filePath, Buffer.from([255, 216, i, 255, 217]));
+      const photo = store.importPhoto({ filePath, fileHash: `photo-${i}`, capturedAt: original.capturedAt, latitude: null, longitude: null, locationName: null, title: '', description: '' });
+      store.saveAnalysis(photo.id, { metrics: { ...original.metrics!, visualHash: `visual-${i}`, perceptualHash: `test-hash-${i}` }, assessment: original.assessment!, totalScore: 85, status: 'pending', error: null, analysisVersion: 'test' });
+    }
+    store.groupPhotos(6, 300); store.ensureDrafts(selectionPolicy);
+    const drafts = store.listDrafts();
+    expect(drafts.map(draft => draft.photoIds.length).sort((a, b) => a - b)).toEqual([1, 12]);
+    const sources = drafts.map(({ id, revision }) => ({ id, revision }));
+    const photoIds = drafts.flatMap(draft => draft.photoIds);
+    const send = (route: string, method: string, body: unknown) => fetch(root + route, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const before = store.listPosts();
+    expect((await send('/api/drafts/merge', 'POST', { sources, photoIds })).status).toBe(400);
+    expect(store.listPosts()).toEqual(before);
+    const response = await send('/api/drafts/merge', 'POST', { sources, photoIds: photoIds.slice(0, 12) });
+    expect(response.status).toBe(200);
+    const { draft } = await response.json();
+    expect(draft.photoIds).toHaveLength(12);
+    const selected = [...draft.photoIds].reverse();
+    const edit = await send(`/api/drafts/${draft.id}`, 'PUT', { photoIds: selected, title: '' });
+    expect(edit.status).toBe(200);
+    expect((await edit.json()).photoIds).toEqual(selected);
+    const edited = store.listPosts();
+    expect((await send(`/api/drafts/${draft.id}`, 'PUT', { photoIds })).status).toBe(400);
+    expect(store.listPosts()).toEqual(edited);
+    const details = await (await fetch(`${root}/api/drafts/${draft.id}/handoff`)).json();
+    expect(details.photos.map((photo: { id: number }) => photo.id)).toEqual(selected);
+    const packageResponse = await fetch(`${root}/api/drafts/${draft.id}/package?revision=${details.revision}`);
+    expect(packageResponse.status).toBe(200);
+    const bytes = Buffer.from(await packageResponse.arrayBuffer());
+    expect(bytes.readUInt32LE(bytes.length - 22)).toBe(0x06054b50);
+    expect(bytes.readUInt16LE(bytes.length - 12)).toBe(17); // Twelve originals and five text files.
+    expect(store.listPosts()).toEqual(edited);
+    expect((await (await fetch(root + '/api/settings')).json()).maxImagesPerPost).toBe(12);
+    expect(XhsPublisher).not.toHaveBeenCalled();
+  });
+
   it('blocks all former automated submission routes without opening a browser or changing records', async () => {
     const before = store.listPosts();
     for (const route of [`/api/drafts/${draftId}/save`, `/api/drafts/${draftId}/publish`, '/api/publish']) {

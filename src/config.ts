@@ -24,7 +24,7 @@ const envSchema = z.object({
   SCORING_SCHEDULE: z.string().default('0 2 * * *'),
   SELECTION_SCHEDULE: z.string().default('0 3 * * *'),
   MAX_POSTS_PER_RUN: z.coerce.number().int().min(1).max(20).default(2),
-  MAX_IMAGES_PER_POST: z.coerce.number().int().min(1).max(9).default(6),
+  MAX_IMAGES_PER_POST: z.coerce.number().int().min(1).max(12).default(12),
   EVENT_GAP_HOURS: z.coerce.number().positive().default(6),
   EVENT_RADIUS_METERS: z.coerce.number().positive().default(300),
   MIN_SHORT_EDGE: z.coerce.number().int().positive().default(720),

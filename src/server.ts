@@ -23,7 +23,7 @@ import { xhsDraftReview } from './xhs-review.js';
 
 const mergeDraftsSchema = z.object({
   sources: z.array(z.object({ id: z.number().int().positive().safe(), revision: z.number().int().nonnegative().safe() })).min(2).max(100),
-  photoIds: z.array(z.number().int().positive().safe()).min(1).max(9),
+  photoIds: z.array(z.number().int().positive().safe()).min(1).max(config.MAX_IMAGES_PER_POST),
   title: z.string().optional(), description: z.string().optional(), scheduledAt: z.string().nullable().optional()
 });
 
