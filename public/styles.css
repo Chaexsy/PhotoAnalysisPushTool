@@ -14,6 +14,7 @@
   font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 * { box-sizing: border-box; }
+body:has(dialog[open]) { overflow: hidden; }
 body { margin: 0; background: var(--paper); color: var(--ink); }
 .shell { max-width: 1280px; margin: 0 auto; padding: 36px 28px 24px; }
 .topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
@@ -205,6 +206,9 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px va
 .photo-option img { aspect-ratio: 1.15; border-radius: 7px; height: auto; object-fit: cover; width: 100%; }
 .photo-option strong { color: var(--ink); font-size: 10px; overflow: hidden; padding: 0 3px; text-overflow: ellipsis; white-space: nowrap; }
 .photo-option span { color: var(--muted); font-size: 10px; padding: 0 3px 3px; }
+.photo-picker-preview { background: transparent; border: 0; border-radius: 7px; cursor: zoom-in; display: block; flex: 0 0 auto; min-height: 0; padding: 0; width: 100%; }
+.photo-picker-preview:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+.photo-picker-preview img { pointer-events: none; }
 .photo-option-disabled { cursor: not-allowed; opacity: .58; }.photo-option-disabled span { color: var(--amber); line-height: 1.4; }
 .controls { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; margin-bottom: 14px; }
 .select-label { align-items: center; color: var(--muted); display: flex; gap: 10px; font-size: 12px; }
@@ -283,7 +287,8 @@ footer { color: var(--muted); display: flex; font-size: 11px; justify-content: s
 .draft-photo-options { width: 100%; }
 .draft-selected-photo { max-width: 100%; min-width: 0; }
 .draft-selected-photo strong, .draft-selected-photo span { overflow-wrap: anywhere; }
-.photo-picker-modal { height: min(90vh, 780px); max-height: calc(100vh - 24px); width: min(900px, calc(100vw - 24px)); }
+.photo-picker-modal { display: flex; flex-direction: column; height: min(90vh, 780px); max-height: calc(100vh - 24px); overflow: hidden; width: min(900px, calc(100vw - 24px)); }
+.photo-picker-modal .modal-card { display: flex; flex: 1 1 auto; flex-direction: column; height: 100%; max-height: none; min-height: 0; }
 .photo-picker-modal form { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; overflow: hidden; }
 .photo-picker-options { align-content: start; flex: 1 1 auto; grid-auto-rows: 290px; grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: calc(100vh - 250px); min-width: 0; overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; }
 .photo-option { height: 290px; min-width: 0; overflow: hidden; }

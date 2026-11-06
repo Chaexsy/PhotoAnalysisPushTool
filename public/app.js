@@ -5,6 +5,7 @@ state.deletingDrafts = new Set();
 state.draftToDelete = null;
 Object.assign(state, { selectedMergeDrafts: new Set(), mergeContext: null, mergePhotoIds: new Set(), mergeVisibleCount: 36, mergingDrafts: false });
 Object.assign(state, { savingDrafts: new Set(), draftSaveErrors: new Map() });
+Object.assign(state, { photoPickerReturn: null, photoPickerOrigin: null, photoDetailReturn: null });
 const editableScores = [['quality', '质量', 20], ['composition', '构图', 20], ['aesthetics', '审美', 30], ['story', '故事性', 20], ['technicalScore', '技术', 10]];
 const pages = {
   photos: { path: '/photos', title: '照片库', description: '浏览全部图片，筛选扫描状态并查看详细评价。' },
@@ -80,7 +81,37 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
 }
 function openDialog(id) { const dialog = document.getElementById(id); if (!dialog.open) dialog.showModal(); }
-function closeDialog(id) { const dialog = document.getElementById(id); if (dialog.open) dialog.close(); }
+function scheduleDialogReturn(callback) { setTimeout(callback, 0); }
+function handleDialogClose(id) {
+  if (id === 'photoPickerDialog') {
+    const returnTo = state.photoPickerReturn;
+    state.photoPickerReturn = null;
+    if (returnTo === 'draft' && state.editingDraft && state.page === 'queue') {
+      state.photoPickerOrigin = null;
+      scheduleDialogReturn(() => { renderDraftSelectedPhotos(); openDialog('draftDialog'); });
+    }
+    return;
+  }
+  if (id === 'photoDetailDialog' && state.photoDetailReturn === 'picker') {
+    state.photoDetailReturn = null;
+    const returnTo = state.photoPickerOrigin;
+    scheduleDialogReturn(() => {
+      if (returnTo === 'draft' && state.editingDraft && state.page === 'queue') {
+        state.photoPickerReturn = 'draft';
+        renderDraftPicker();
+        openDialog('photoPickerDialog');
+      }
+    });
+  }
+}
+function closeDialog(id) {
+  const dialog = document.getElementById(id);
+  if (!dialog.open) return;
+  dialog.close();
+  // Handle the return immediately as well as through the native close event.
+  // This keeps nested dialogs reliable across browsers with different event timing.
+  handleDialogClose(id);
+}
 
 function showPageMessage(message = '', error = false) {
   const element = $('#pageMessage');
@@ -103,6 +134,7 @@ function navigateToPage(page, { history = 'push', initial = false } = {}) {
   if (page !== 'photos') { if (scanPollTimer) { clearTimeout(scanPollTimer); scanPollTimer = null; } if (selectionPollTimer) { clearTimeout(selectionPollTimer); selectionPollTimer = null; } }
   state.refreshRequest++;
   state.photoLibrary.request++;
+  state.photoPickerReturn = null; state.photoPickerOrigin = null; state.photoDetailReturn = null;
   document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
   document.querySelectorAll('[data-page]').forEach(section => { section.hidden = section.dataset.page !== page; });
   document.querySelectorAll('[data-page-link]').forEach(link => {
@@ -555,9 +587,19 @@ async function openPhotoDetail(id, record = false) {
   const request = ++state.detailRequest;
   try {
     const photo = await getJson(record ? `/api/photos/${id}` : `/api/photo-library/${id}`);
-    if (navigation !== state.navigation || request !== state.detailRequest) return;
-    renderPhotoDetail(photo); openDialog('photoDetailDialog');
-  } catch (error) { if (navigation === state.navigation) showToast(`读取照片详情失败：${error.message}`); }
+    if (navigation !== state.navigation || request !== state.detailRequest) return false;
+    renderPhotoDetail(photo); openDialog('photoDetailDialog'); return true;
+  } catch (error) { if (navigation === state.navigation) showToast(`读取照片详情失败：${error.message}`); return false; }
+}
+
+async function openPickerPhotoDetail(id) {
+  state.photoPickerReturn = 'detail'; state.photoDetailReturn = 'picker';
+  closeDialog('photoPickerDialog');
+  if (!await openPhotoDetail(id, true)) {
+    state.photoDetailReturn = null;
+    state.photoPickerReturn = state.photoPickerOrigin === 'draft' ? 'draft' : null;
+    if (state.editingDraft && state.page === 'queue') openDialog('photoPickerDialog');
+  }
 }
 function renderDirectoryOptions(directories) {
   const current = $('#photoDirectoryFilter').value;
@@ -709,7 +751,7 @@ function renderDraftPicker() {
     const status = selectable ? `${scoreLabel(photo.totalScore)} · ${photo.metrics?.orientation === 'landscape' ? '横图' : '竖图'}` : `不可选：${reason}`;
     const thumbnail = `/api/photos/${photo.id}/thumbnail?width=240`;
     const image = index < 6 ? `<img src="${thumbnail}" alt="照片 ${photo.id}">` : `<img loading="lazy" data-src="${thumbnail}" alt="照片 ${photo.id}">`;
-    return `<label class="photo-option${selectable ? '' : ' photo-option-disabled'}" title="${selectable ? '点击选择照片' : `不可选原因：${escapeHtml(reason)}`}\"><input type="checkbox" value="${photo.id}" ${state.pickerSelectedIds.has(photo.id) ? 'checked' : ''} ${selectable ? '' : 'disabled'}>${image}<strong>${escapeHtml(fileName)}</strong><span>${escapeHtml(capturedAt)} · ${escapeHtml(status)}</span></label>`;
+    return `<label class="photo-option${selectable ? '' : ' photo-option-disabled'}" title="${selectable ? '点击选择照片' : `不可选原因：${escapeHtml(reason)}`}\"><input type="checkbox" value="${photo.id}" ${state.pickerSelectedIds.has(photo.id) ? 'checked' : ''} ${selectable ? '' : 'disabled'}><button type="button" class="photo-picker-preview" data-photo-id="${photo.id}" aria-label="查看照片 ${photo.id} 原图">${image}</button><strong>${escapeHtml(fileName)}</strong><span>${escapeHtml(capturedAt)} · ${escapeHtml(status)}</span></label>`;
   }).join('') : '<p class="form-hint">同一天没有可添加的照片。</p>';
   const more = $('#loadMorePicker');
   more.hidden = visible.length >= candidates.length;
@@ -793,6 +835,8 @@ async function openDraftEditor(id) {
 function openDraftPicker() {
   state.pickerSelectedIds = new Set();
   $('#photoPickerHint').textContent = '这里按时间顺序显示与草稿照片同一天拍摄的照片；已被其他草稿占用的照片不会显示，可添加照片需已完成评分。';
+  state.photoPickerOrigin = 'draft'; state.photoPickerReturn = 'draft';
+  closeDialog('draftDialog');
   renderDraftPicker();
   openDialog('photoPickerDialog');
 }
@@ -820,6 +864,8 @@ document.querySelectorAll('[data-page-link]').forEach(link => link.addEventListe
 window.addEventListener('popstate', () => navigateToPage(pageFromPath(), { history: 'none' }));
 $('#settingsButton').addEventListener('click', () => { state.settingsDirty = false; renderSettings(); openDialog('settingsDialog'); });
 document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => closeDialog(button.dataset.closeDialog)));
+$('#photoPickerDialog').addEventListener('close', () => handleDialogClose('photoPickerDialog'));
+$('#photoDetailDialog').addEventListener('close', () => handleDialogClose('photoDetailDialog'));
 $('#refreshButton').addEventListener('click', () => refresh());
 $('#deleteDraftForm').addEventListener('submit', async event => {
   event.preventDefault();
@@ -919,6 +965,12 @@ $('#settingsForm').addEventListener('submit', async (event) => {
 });
 $('#addDraftPhotos').addEventListener('click', openDraftPicker);
 $('#loadMorePicker').addEventListener('click', () => { state.pickerVisibleCount += 36; renderDraftPicker(); });
+$('#pickerPhotoOptions').addEventListener('click', event => {
+  const preview = event.target.closest('.photo-picker-preview');
+  if (!preview) return;
+  event.preventDefault(); event.stopPropagation();
+  void openPickerPhotoDetail(Number(preview.dataset.photoId));
+});
 $('#pickerPhotoOptions').addEventListener('change', event => {
   const input = event.target.closest('input[type="checkbox"]');
   if (!input) return;
