@@ -199,13 +199,13 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px va
 .link-button:hover { color: var(--red); }
 .draft-text-fields textarea { background: #fff; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); font: inherit; font-size: 12px; min-height: 88px; padding: 9px 11px; resize: vertical; width: 100%; }
 .draft-photos-heading { align-items: center; display: flex; justify-content: space-between; gap: 14px; margin-top: 16px; }.draft-photo-options { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); margin-top: 15px; }.draft-selected-photo { align-items: center; background: #f7f8f4; border: 1px solid var(--line); border-radius: 11px; display: grid; gap: 8px; grid-template-columns: 72px 1fr auto; min-width: 0; padding: 6px; }.draft-selected-photo img { aspect-ratio: 1.15; border-radius: 7px; object-fit: cover; width: 72px; }.draft-selected-photo div { display: flex; flex-direction: column; gap: 5px; min-width: 0; }.draft-selected-photo strong { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.draft-selected-photo span { font-size: 10px; font-weight: 700; }.draft-selected-photo .icon-button { font-size: 22px; }
-.photo-option { background: #f7f8f4; border: 2px solid transparent; border-radius: 11px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; overflow: hidden; padding: 5px; }
+.photo-option { align-self: start; background: #f7f8f4; border: 2px solid transparent; border-radius: 11px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; overflow: hidden; padding: 5px; }
 .photo-option:has(input:checked) { border-color: var(--green); }
 .photo-option input { accent-color: var(--green); align-self: flex-end; min-height: auto; position: absolute; width: auto; }
-.photo-option img { aspect-ratio: 1.15; border-radius: 7px; object-fit: cover; width: 100%; }
+.photo-option img { aspect-ratio: 1.15; border-radius: 7px; height: auto; object-fit: cover; width: 100%; }
 .photo-option strong { color: var(--ink); font-size: 10px; overflow: hidden; padding: 0 3px; text-overflow: ellipsis; white-space: nowrap; }
 .photo-option span { color: var(--muted); font-size: 10px; padding: 0 3px 3px; }
-.photo-option-disabled { cursor: not-allowed; opacity: .58; }
+.photo-option-disabled { cursor: not-allowed; opacity: .58; }.photo-option-disabled span { color: var(--amber); line-height: 1.4; }
 .controls { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; margin-bottom: 14px; }
 .select-label { align-items: center; color: var(--muted); display: flex; gap: 10px; font-size: 12px; }
 select { appearance: none; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%2378837b' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 12px center; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); font: inherit; font-size: 12px; padding: 9px 34px 9px 12px; }
@@ -285,9 +285,9 @@ footer { color: var(--muted); display: flex; font-size: 11px; justify-content: s
 .draft-selected-photo strong, .draft-selected-photo span { overflow-wrap: anywhere; }
 .photo-picker-modal { height: min(90vh, 780px); max-height: calc(100vh - 24px); width: min(900px, calc(100vw - 24px)); }
 .photo-picker-modal form { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; overflow: hidden; }
-.photo-picker-options { flex: 1 1 auto; grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: calc(100vh - 250px); min-width: 0; overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; }
-.photo-option { min-width: 0; overflow: hidden; }
-.photo-option img { display: block; max-width: 100%; min-width: 0; }
+.photo-picker-options { align-content: start; flex: 1 1 auto; grid-auto-rows: 290px; grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: calc(100vh - 250px); min-width: 0; overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; }
+.photo-option { height: 290px; min-width: 0; overflow: hidden; }
+.photo-option img { display: block; height: 220px; max-width: 100%; min-width: 0; }
 .photo-option span { overflow-wrap: anywhere; }
 .picker-more { flex: 0 0 auto; min-height: 38px; padding-top: 10px; text-align: center; }
 .picker-more[hidden] { display: none; }

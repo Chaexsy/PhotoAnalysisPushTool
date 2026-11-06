@@ -701,12 +701,15 @@ function renderDraftSelectedPhotos() {
 function renderDraftPicker() {
   const candidates = state.editingCandidates.filter(photo => !state.editingPhotoIds.has(photo.id));
   const visible = candidates.slice(0, state.pickerVisibleCount);
-  $('#pickerPhotoOptions').innerHTML = visible.length ? visible.map(photo => {
+  $('#pickerPhotoOptions').innerHTML = visible.length ? visible.map((photo, index) => {
     const selectable = photo.status === 'pending';
     const fileName = photo.filePath?.split(/[\\/]/).pop() || `照片 ${photo.id}`;
     const capturedAt = photo.capturedAt ? formatTime(photo.capturedAt) : '无拍摄时间';
-    const status = selectable ? `${scoreLabel(photo.totalScore)} · ${photo.metrics?.orientation === 'landscape' ? '横图' : '竖图'}` : `当前状态：${photoStatusText[photo.status] || photo.status}`;
-    return `<label class="photo-option${selectable ? '' : ' photo-option-disabled'}"><input type="checkbox" value="${photo.id}" ${state.pickerSelectedIds.has(photo.id) ? 'checked' : ''} ${selectable ? '' : 'disabled'}><img loading="lazy" data-src="/api/photos/${photo.id}/thumbnail?width=240" alt="照片 ${photo.id}"><strong>${escapeHtml(fileName)}</strong><span>${escapeHtml(capturedAt)} · ${escapeHtml(status)}</span></label>`;
+    const reason = photo.error?.trim() || photoStatusText[photo.status] || photo.status;
+    const status = selectable ? `${scoreLabel(photo.totalScore)} · ${photo.metrics?.orientation === 'landscape' ? '横图' : '竖图'}` : `不可选：${reason}`;
+    const thumbnail = `/api/photos/${photo.id}/thumbnail?width=240`;
+    const image = index < 6 ? `<img src="${thumbnail}" alt="照片 ${photo.id}">` : `<img loading="lazy" data-src="${thumbnail}" alt="照片 ${photo.id}">`;
+    return `<label class="photo-option${selectable ? '' : ' photo-option-disabled'}" title="${selectable ? '点击选择照片' : `不可选原因：${escapeHtml(reason)}`}\"><input type="checkbox" value="${photo.id}" ${state.pickerSelectedIds.has(photo.id) ? 'checked' : ''} ${selectable ? '' : 'disabled'}>${image}<strong>${escapeHtml(fileName)}</strong><span>${escapeHtml(capturedAt)} · ${escapeHtml(status)}</span></label>`;
   }).join('') : '<p class="form-hint">同一天没有可添加的照片。</p>';
   const more = $('#loadMorePicker');
   more.hidden = visible.length >= candidates.length;
