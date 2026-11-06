@@ -701,7 +701,13 @@ function renderDraftSelectedPhotos() {
 function renderDraftPicker() {
   const candidates = state.editingCandidates.filter(photo => !state.editingPhotoIds.has(photo.id));
   const visible = candidates.slice(0, state.pickerVisibleCount);
-  $('#pickerPhotoOptions').innerHTML = visible.length ? visible.map(photo => `<label class="photo-option"><input type="checkbox" value="${photo.id}" ${state.pickerSelectedIds.has(photo.id) ? 'checked' : ''}><img loading="lazy" data-src="/api/photos/${photo.id}/thumbnail?width=240" alt="照片 ${photo.id}"><span>#${photo.id} · ${escapeHtml(scoreLabel(photo.totalScore))} · ${photo.metrics?.orientation === 'landscape' ? '横图' : '竖图'}</span></label>`).join('') : '<p class="form-hint">没有可添加的照片。</p>';
+  $('#pickerPhotoOptions').innerHTML = visible.length ? visible.map(photo => {
+    const selectable = photo.status === 'pending';
+    const fileName = photo.filePath?.split(/[\\/]/).pop() || `照片 ${photo.id}`;
+    const capturedAt = photo.capturedAt ? formatTime(photo.capturedAt) : '无拍摄时间';
+    const status = selectable ? `${scoreLabel(photo.totalScore)} · ${photo.metrics?.orientation === 'landscape' ? '横图' : '竖图'}` : `当前状态：${photoStatusText[photo.status] || photo.status}`;
+    return `<label class="photo-option${selectable ? '' : ' photo-option-disabled'}"><input type="checkbox" value="${photo.id}" ${state.pickerSelectedIds.has(photo.id) ? 'checked' : ''} ${selectable ? '' : 'disabled'}><img loading="lazy" data-src="/api/photos/${photo.id}/thumbnail?width=240" alt="照片 ${photo.id}"><strong>${escapeHtml(fileName)}</strong><span>${escapeHtml(capturedAt)} · ${escapeHtml(status)}</span></label>`;
+  }).join('') : '<p class="form-hint">同一天没有可添加的照片。</p>';
   const more = $('#loadMorePicker');
   more.hidden = visible.length >= candidates.length;
   more.textContent = `加载更多（剩余 ${Math.max(0, candidates.length - visible.length)} 张）`;
@@ -750,7 +756,11 @@ async function openDraftEditor(id) {
   const draft = state.drafts.find(item => item.id === id); if (!draft) return;
   const navigation = state.navigation;
   try {
-    const photos = (await Promise.all((draft.merged ? draft.eventIds : [draft.eventId]).map(eventId => getJson(`/api/photos?eventId=${eventId}&summary=1`)))).flat();
+    const draftPhotos = draft.photoIds.map(photoId => state.photos.get(photoId)).filter(Boolean);
+    const captureDates = [...new Set(draftPhotos.map(photo => photo.capturedAt?.slice(0, 10)).filter(Boolean))];
+    const photos = captureDates.length
+      ? (await Promise.all(captureDates.map(capturedDate => getJson(`/api/photos?capturedDate=${encodeURIComponent(capturedDate)}`)))).flat()
+      : (await Promise.all((draft.merged ? draft.eventIds : [draft.eventId]).map(eventId => getJson(`/api/photos?eventId=${eventId}&summary=1`)))).flat();
     photos.forEach(photo => state.photos.set(photo.id, { ...state.photos.get(photo.id), ...photo }));
   }
   catch (error) { showToast(`读取草稿照片失败：${error.message}`); return; }
@@ -761,8 +771,10 @@ async function openDraftEditor(id) {
   state.pickerSelectedIds = new Set();
   const heldElsewhere = new Set(state.drafts.filter(item => item.id !== id).flatMap(item => item.photoIds));
   const eventIds = draft.merged ? draft.eventIds : [draft.eventId];
-  state.editingCandidates = [...state.photos.values()].filter(photo => eventIds.includes(photo.eventId) && !heldElsewhere.has(photo.id) && (photo.status === 'pending' || state.editingPhotoIds.has(photo.id)))
-    .sort((a, b) => (b.totalScore ?? -1) - (a.totalScore ?? -1) || a.id - b.id);
+  const captureDates = new Set(draft.photoIds.map(photoId => state.photos.get(photoId)?.capturedAt?.slice(0, 10)).filter(Boolean));
+  state.editingCandidates = [...state.photos.values()]
+    .filter(photo => captureDates.has(photo.capturedAt?.slice(0, 10)) && !heldElsewhere.has(photo.id) && !state.editingPhotoIds.has(photo.id))
+    .sort((a, b) => Date.parse(a.capturedAt ?? '') - Date.parse(b.capturedAt ?? '') || a.id - b.id);
   $('#draftId').value = String(draft.id); $('#draftTitle').value = draft.title || ''; $('#draftDescription').value = (draft.description || '').trim().slice(0, 50);
   $('#draftScheduledAt').value = dateTimeLocal(draft.scheduledAt);
   state.draftMetadata = { topics: [...(draft.topics || [])], verifiedTopics: [...(draft.verifiedTopics || [])], locationTag: draft.locationTag || '', locationVerified: Boolean(draft.locationVerified), topicCandidates: [], locationCandidates: [], searchingTopic: false, searchingLocation: false };
@@ -770,14 +782,14 @@ async function openDraftEditor(id) {
   $('#draftTopicQuery').value = '';
   $('#draftLocationSuggestion').textContent = `建议地点：${draft.locationName || '无'}。发布时请在自己的小红书网页搜索并选择。`;
   $('#draftMeta').textContent = `${draft.locationName || '未记录地点'} · ${draft.orientation === 'landscape' ? '横图' : '竖图'} · ${draft.theme || '—'}`;
-  $('#draftPhotoRule').textContent = `${draft.merged ? '合并笔记可包含不同拍摄事件和主题，须保持方向一致' : '同一拍摄事件、同一方向和同一主题'}，最多 ${state.settings?.maxImagesPerPost ?? 12} 张。`;
+  $('#draftPhotoRule').textContent = `${draft.merged ? '合并笔记可包含不同拍摄事件和主题' : '可从草稿照片同一天的拍摄记录中选择'}，须保持方向一致，最多 ${state.settings?.maxImagesPerPost ?? 12} 张。`;
   renderDraftMetadata(); renderDraftSelectedPhotos(); renderDraftPicker();
   $('#draftStatus').textContent = ''; openDialog('draftDialog');
 }
 
 function openDraftPicker() {
   state.pickerSelectedIds = new Set();
-  $('#photoPickerHint').textContent = state.editingDraft?.merged ? '这里只显示合并笔记所含拍摄事件中尚未加入本篇草稿的可用照片。' : '这里只显示当前事件中尚未加入本篇草稿的可用照片。';
+  $('#photoPickerHint').textContent = '这里按时间顺序显示与草稿照片同一天拍摄的照片；已被其他草稿占用的照片不会显示，可添加照片需已完成评分。';
   renderDraftPicker();
   openDialog('photoPickerDialog');
 }

@@ -63,6 +63,11 @@ export function createServer() {
       const ids = [...new Set(req.query.ids.split(',').map(Number).filter(id => Number.isSafeInteger(id) && id > 0))].slice(0, 500);
       return res.json(ids.map(id => store.getPhoto(id)).filter(Boolean));
     }
+    if (typeof req.query.capturedDate === 'string') {
+      const capturedDate = req.query.capturedDate.trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(capturedDate)) return res.status(400).json({ error: '拍摄日期格式无效' });
+      return res.json(store.capturedDatePhotos(capturedDate));
+    }
     if (typeof req.query.eventId === 'string' && Number.isSafeInteger(Number(req.query.eventId))) {
       const eventId = Number(req.query.eventId);
       if (req.query.summary === '1') return res.json(store.eventPhotoSummaries(eventId));

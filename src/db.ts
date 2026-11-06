@@ -155,13 +155,18 @@ export class PhotoStore {
   eventPhotos(eventId: number): PhotoRecord[] {
     return (this.db.prepare('SELECT * FROM photos WHERE event_id=? ORDER BY total_score DESC,id').all(eventId) as Row[]).map(mapPhoto);
   }
+  /** Return all photos captured on a calendar day, in capture-time order. */
+  capturedDatePhotos(capturedDate: string): PhotoRecord[] {
+    return (this.db.prepare("SELECT * FROM photos WHERE captured_at IS NOT NULL AND substr(captured_at,1,10)=? ORDER BY captured_at ASC,id ASC").all(capturedDate) as Row[]).map(mapPhoto);
+  }
   eventPhotoSummaries(eventId: number) {
-    return (this.db.prepare('SELECT id,file_path,status,total_score,metrics_json FROM photos WHERE event_id=? ORDER BY total_score DESC,id').all(eventId) as Row[]).map(row => {
+    return (this.db.prepare('SELECT id,file_path,status,total_score,captured_at,metrics_json FROM photos WHERE event_id=? ORDER BY total_score DESC,id').all(eventId) as Row[]).map(row => {
       const metrics = row.metrics_json ? JSON.parse(row.metrics_json) : null;
       return {
         id: row.id,
         filePath: row.file_path,
         status: row.status as PhotoStatus,
+        capturedAt: row.captured_at ?? null,
         totalScore: row.total_score ?? null,
         metrics: metrics ? { width: metrics.width, height: metrics.height, orientation: metrics.orientation } : null
       };
@@ -612,7 +617,14 @@ export class PhotoStore {
         if (photo.status !== 'pending' && !currentIds.has(id)) throw new Error(`照片 ${id} 当前状态为 ${photo.status}，不能加入草稿`);
         return photo;
       });
-      const event = this.validateDraftPhotos(photos, policy, draft.merged);
+      const mixedEvents = new Set(photos.map(photo => photo.eventId)).size > 1;
+      const captureDates = new Set(photos.map(photo => photo.capturedAt?.slice(0, 10) ?? null));
+      // The add-photo picker is day based. Preserve the old restriction for
+      // API callers that try to mix different days, while promoting a
+      // same-day edit to a mixed-event draft so it remains editable later.
+      if (mixedEvents && !draft.merged && captureDates.size > 1) throw new Error('跨拍摄事件添加照片时必须来自同一天');
+      const merged = draft.merged || mixedEvents;
+      const event = this.validateDraftPhotos(photos, policy, merged);
       if (photos.some(photo => otherDraftPhotos.some(other => isDuplicate(photo, other, policy.duplicateDistance)))) throw new Error('照片与其他待发布草稿重复或近似');
       const generated = batchFrom(photos, event);
       const fields = typeof titleOrFields === 'string'
@@ -641,9 +653,9 @@ export class PhotoStore {
         : Boolean(fields.locationVerified) && Boolean(nextLocationTag);
       this.db.prepare('DELETE FROM post_photos WHERE post_id=?').run(postId);
       photos.forEach((photo, position) => this.db.prepare('INSERT INTO post_photos VALUES(?,?,?)').run(postId, photo.id, position));
-      const theme = draft.merged && new Set(photos.map(photo => photo.assessment!.theme)).size > 1 ? '综合' : generated.theme;
-      this.db.prepare('UPDATE posts SET event_id=?,orientation=?,theme=?,title=?,description=?,scheduled_at=?,location_tag=?,topics_json=?,verified_topics_json=?,location_verified=?,revision=revision+1 WHERE id=?')
-        .run(event.id, generated.orientation, theme, nextTitle, nextDescription, nextScheduledAt, nextLocationTag, JSON.stringify(nextTopics), JSON.stringify(nextVerifiedTopics), nextLocationVerified ? 1 : 0, postId);
+      const theme = merged && new Set(photos.map(photo => photo.assessment!.theme)).size > 1 ? '综合' : generated.theme;
+      this.db.prepare('UPDATE posts SET event_id=?,merged=?,orientation=?,theme=?,title=?,description=?,scheduled_at=?,location_tag=?,topics_json=?,verified_topics_json=?,location_verified=?,revision=revision+1 WHERE id=?')
+        .run(event.id, merged ? 1 : 0, generated.orientation, theme, nextTitle, nextDescription, nextScheduledAt, nextLocationTag, JSON.stringify(nextTopics), JSON.stringify(nextVerifiedTopics), nextLocationVerified ? 1 : 0, postId);
       return this.postById(postId)!;
     });
   }

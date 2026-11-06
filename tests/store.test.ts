@@ -127,6 +127,28 @@ describe('PhotoStore publication invariants', () => {
     store.close();
   });
 
+  it('lists a capture day chronologically and allows same-day cross-event draft edits', () => {
+    const store = new PhotoStore(':memory:');
+    try {
+      const early = store.importPhoto({ filePath: '/same-day-early.jpg', fileHash: 'same-day-early', capturedAt: '2026-10-12T08:00:00.000Z', latitude: null, longitude: null, locationName: null, title: '', description: '' });
+      const late = store.importPhoto({ filePath: '/same-day-late.jpg', fileHash: 'same-day-late', capturedAt: '2026-10-12T20:00:00.000Z', latitude: null, longitude: null, locationName: null, title: '', description: '' });
+      const nextDay = store.importPhoto({ filePath: '/next-day.jpg', fileHash: 'next-day', capturedAt: '2026-10-13T08:00:00.000Z', latitude: null, longitude: null, locationName: null, title: '', description: '' });
+      for (const [index, photo] of [early, late, nextDay].entries()) store.saveAnalysis(photo.id, { metrics: metrics(index), assessment: assessment(index), totalScore: 82, status: 'pending', error: null, analysisVersion: 'test' });
+      store.groupPhotos(6, 300);
+      expect(store.capturedDatePhotos('2026-10-12').map(photo => photo.id)).toEqual([early.id, late.id]);
+      expect(store.capturedDatePhotos('2026-10-13').map(photo => photo.id)).toEqual([nextDay.id]);
+
+      store.ensureDrafts(policy);
+      const drafts = store.listDrafts();
+      const earlyDraft = drafts.find(draft => draft.photoIds.includes(early.id))!;
+      const lateDraft = drafts.find(draft => draft.photoIds.includes(late.id))!;
+      store.deleteDraft(lateDraft.id);
+      const edited = store.updateDraft(earlyDraft.id, [early.id, late.id], policy, { title: '' });
+      expect(edited.merged).toBe(true);
+      expect(edited.photoIds).toEqual([early.id, late.id]);
+    } finally { store.close(); }
+  });
+
   it('creates idempotent drafts and allows editing before reservation', () => {
     const store = new PhotoStore(':memory:');
     const ids: number[] = [];
